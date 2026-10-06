@@ -1,0 +1,67 @@
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ cat tfc-audit.ndjson 
+{"id":"audit-003","timestamp":"2026-10-06T02:30:00Z","action":"run.create","organization":"my-org","request":{"id":"ws-123456"},"resource":{"id":"run-abc123","type":"run","action":"errored"},"auth":{"id":"user-123","username":"admin","email":"admin@example.com"}}
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq --location=US mk -d tfc_logs
+Dataset 'micro-handler-247607:tfc_logs' successfully created.
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq mk \
+  --table \
+  tfc_logs.audit_logs \
+  id:STRING,timestamp:TIMESTAMP,action:STRING,organization:STRING,request:STRUCT<id STRING>,resource:STRUCT<id STRING,type STRING,action STRING>,auth:STRUCT<id STRING,username STRING,email STRING>
+bash: syntax error near unexpected token `newline'
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq mk \
+  --table \
+  tfc_logs.audit_logs \
+  id:STRING,timestamp:TIMESTAMP,action:STRING,organization:STRING,request:STRUCT<id STRING>,resource:STRUCT<id STRING,type STRING,action STRING>,auth:STRUCT<id STRING,username STRING,email STRING>
+bash: syntax error near unexpected token `newline'
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ ^C
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq query --use_legacy_sql=false '
+CREATE TABLE `tfc_logs.audit_logs` (
+  id STRING,
+  timestamp TIMESTAMP,
+  action STRING,
+  organization STRING,
+  request STRUCT<
+    id STRING
+  >,
+  resource STRUCT<
+    id STRING,
+    type STRING,
+    action STRING
+  >,
+  auth STRUCT<
+    id STRING,
+    username STRING,
+    email STRING
+  >
+)'
+Waiting on bqjob_r79747f1c48b00772_000001a10f2594de_1 ... (0s) Current status: DONE   
+Created micro-handler-247607.tfc_logs.audit_logs
+
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq load \
+  --source_format=NEWLINE_DELIMITED_JSON \
+  tfc_logs.audit_logs \
+  tfc-audit.ndjson
+Upload complete.
+Waiting on bqjob_r3acaf1341684f26a_000001a10f25f739_1 ... (0s) Current status: DONE   
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ bq query --use_legacy_sql=false '
+SELECT
+  id,
+  timestamp,
+  action,
+  organization,
+  request.id AS workspace_id,
+  resource.id AS run_id,
+  resource.type AS resource_type,
+  resource.action AS resource_action,
+  auth.id AS user_id,
+  auth.username,
+  auth.email
+FROM `tfc_logs.audit_logs`
+'
++-----------+---------------------+------------+--------------+--------------+------------+---------------+-----------------+----------+----------+-------------------+
+|    id     |      timestamp      |   action   | organization | workspace_id |   run_id   | resource_type | resource_action | user_id  | username |       email       |
++-----------+---------------------+------------+--------------+--------------+------------+---------------+-----------------+----------+----------+-------------------+
+| audit-003 | 2026-10-06 02:30:00 | run.create | my-org       | ws-123456    | run-abc123 | run           | errored         | user-123 | admin    | admin@example.com |
++-----------+---------------------+------------+--------------+--------------+------------+---------------+-----------------+----------+----------+-------------------+
+d_basivireddy@cloudshell:~ (micro-handler-247607)$ 
+
+
